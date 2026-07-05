@@ -503,29 +503,7 @@ export async function setMessageMaxId(
 /** 停止当前 IM DB session */
 export async function stopRequests(): Promise<void> {
   currentSession++
-  const [
-    { useMessageStoreWithOut },
-    { useConversationStoreWithOut },
-    { useFriendStoreWithOut },
-    { useGroupStoreWithOut },
-    { useChannelStoreWithOut },
-    { useGroupRequestStoreWithOut },
-    { useFaceStoreWithOut }
-  ] = await Promise.all([
-    import('../home/store/messageStore'),
-    import('../home/store/conversationStore'),
-    import('../home/store/friendStore'),
-    import('../home/store/groupStore'),
-    import('../home/store/channelStore'),
-    import('../home/store/groupRequestStore'),
-    import('../home/store/faceStore')
-  ])
-  useMessageStoreWithOut().clear()
-  useConversationStoreWithOut().clear()
-  useFriendStoreWithOut().clear()
-  useGroupStoreWithOut().clear()
-  useChannelStoreWithOut().clear()
-  useGroupRequestStoreWithOut().clear()
-  useFaceStoreWithOut().clear()
+  const { clearAllImStores } = await import('../home/store/clearImStores')
+  clearAllImStores()
   closeDbConnection()
 }

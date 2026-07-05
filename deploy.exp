@@ -1,0 +1,99 @@
+#!/usr/bin/expect
+# 后管静态资源部署：上传 dist.zip 到 /qqai/dist
+#
+# 前置：在项目根目录执行
+#   pnpm run build:prod
+#   zip -r dist.zip dist -x "*.DS_Store"
+# 然后：expect deploy.exp
+
+set timeout 600
+set host "47.94.236.184"
+set port "22"
+set user "root"
+set pswd "Qazse@123"
+set remote_path "/qqai"
+set zip_name "dist.zip"
+
+# 与 deploy.exp 同目录，避免写死机器上的绝对路径
+set script_dir [file dirname [info script]]
+set local_file [file join $script_dir $zip_name]
+
+if {![file exists $local_file]} {
+    puts stderr "本地文件不存在: $local_file"
+    puts stderr "请先执行: pnpm run build:prod && zip -r $zip_name dist -x \"*.DS_Store\""
+    exit 1
+}
+
+proc expect_auth {password} {
+    expect {
+        "(yes/no)?" {
+            send "yes\r"
+            exp_continue
+        }
+        -re "(p|P)ass(word|wd):" {
+            send "$password\r"
+        }
+    }
+}
+
+proc wait_shell_prompt {} {
+    expect {
+        -re {[#$] } {}
+        timeout {
+            puts stderr "等待 shell 提示符超时"
+            exit 1
+        }
+    }
+}
+
+puts "==> 上传 $local_file -> $user@$host:$remote_path/"
+
+spawn scp -P $port $local_file $user@$host:$remote_path/
+expect_auth $pswd
+expect {
+    eof {}
+    timeout {
+        puts stderr "SCP 上传超时"
+        exit 1
+    }
+}
+catch wait result
+set scp_code [lindex $result 3]
+if {$scp_code != 0} {
+    puts stderr "SCP 失败，exit=$scp_code"
+    exit $scp_code
+}
+
+puts "==> 远程解压并 reload nginx"
+
+spawn ssh -p $port $user@$host
+expect_auth $pswd
+wait_shell_prompt
+
+send "cd $remote_path\r"
+wait_shell_prompt
+send "rm -rf dist.bak\r"
+wait_shell_prompt
+send "mv dist dist.bak 2>/dev/null || true\r"
+wait_shell_prompt
+send "unzip -o $zip_name\r"
+wait_shell_prompt
+send "rm -f $zip_name\r"
+wait_shell_prompt
+send "test -f dist/index.html && echo 'dist ok' || (echo 'dist/index.html missing' >&2; exit 1)\r"
+expect {
+    "dist ok" {}
+    timeout {
+        puts stderr "远程 dist 校验失败"
+        exit 1
+    }
+}
+wait_shell_prompt
+send "systemctl reload nginx\r"
+wait_shell_prompt
+send "echo 'Admin deployment complete!'\r"
+expect "Admin deployment complete!"
+send "exit\r"
+expect eof
+
+puts "==> 部署完成: $host:$remote_path/dist/"
