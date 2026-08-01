@@ -16,7 +16,7 @@
         </el-form-item>
       </el-col>
       <el-col :span="24" class="px-10px">
-        <el-form-item v-if="registerData.tenantEnable === 'true'" prop="tenantName">
+        <el-form-item v-if="registerData.tenantEnable" prop="tenantName">
           <el-input
             v-model="registerData.registerForm.tenantName"
             :placeholder="t('login.tenantname')"
@@ -81,7 +81,7 @@
         </el-form-item>
       </el-col>
       <Verify
-        v-if="registerData.captchaEnable === 'true'"
+        v-if="registerData.captchaEnable"
         ref="verify"
         :captchaType="captchaType"
         :imgSize="{ width: '400px', height: '200px' }"
@@ -154,8 +154,8 @@ const registerRules = {
 
 const registerData = reactive({
   isShowPassword: false,
-  captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE,
-  tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE,
+  captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
+  tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE === 'true',
   registerForm: {
     tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || '',
     nickname: '',
@@ -216,19 +216,17 @@ const handleRegister = async (params: any) => {
 
 // 获取验证码
 const getCode = async () => {
-  // 情况一，未开启：则直接注册
-  if (registerData.captchaEnable === 'false') {
+  if (!registerData.captchaEnable) {
     await handleRegister({})
-  } else {
-    // 情况二，已开启：则展示验证码；只有完成验证码的情况，才进行注册
-    // 弹出验证码
-    verify.value.show()
+    return
   }
+  await nextTick()
+  verify.value?.show()
 }
 
 // 获取租户 ID
 const getTenantId = async () => {
-  if (registerData.tenantEnable === 'true') {
+  if (registerData.tenantEnable) {
     const res = await LoginApi.getTenantIdByName(registerData.registerForm.tenantName)
     authUtil.setTenantId(res)
   }
@@ -236,7 +234,7 @@ const getTenantId = async () => {
 
 // 根据域名，获得租户信息
 const getTenantByWebsite = async () => {
-  if (registerData.tenantEnable === 'true') {
+  if (registerData.tenantEnable) {
     const website = location.host
     const res = await LoginApi.getTenantByWebsite(website)
     if (res) {

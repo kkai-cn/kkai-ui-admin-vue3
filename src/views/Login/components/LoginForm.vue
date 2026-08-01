@@ -16,7 +16,7 @@
         </el-form-item>
       </el-col>
       <el-col :span="24" class="px-10px">
-        <el-form-item v-if="loginData.tenantEnable === 'true'" prop="tenantName">
+        <el-form-item v-if="loginData.tenantEnable" prop="tenantName">
           <el-input
             v-model="loginData.loginForm.tenantName"
             :placeholder="t('login.tenantNamePlaceholder')"
@@ -75,7 +75,7 @@
         </el-form-item>
       </el-col>
       <Verify
-        v-if="loginData.captchaEnable === 'true'"
+        v-if="loginData.captchaEnable"
         ref="verify"
         :captchaType="captchaType"
         :imgSize="{ width: '400px', height: '200px' }"
@@ -141,6 +141,7 @@
 import { ElLoading } from 'element-plus'
 import LoginFormTitle from './LoginFormTitle.vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import { Verify } from '@/components/Verifition'
 
 import { useIcon } from '@/hooks/web/useIcon'
 
@@ -175,8 +176,8 @@ const LoginRules = {
 }
 const loginData = reactive({
   isShowPassword: false,
-  captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE,
-  tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE,
+  captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
+  tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE === 'true',
   loginForm: {
     tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || '',
     username: import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '',
@@ -195,18 +196,26 @@ const socialList = [
 
 // 获取验证码
 const getCode = async () => {
-  // 情况一，未开启：则直接登录
-  if (loginData.captchaEnable === 'false') {
-    await handleLogin({})
-  } else {
-    // 情况二，已开启：则展示验证码；只有完成验证码的情况，才进行登录
-    // 弹出验证码
-    verify.value.show()
+  // 先校验表单，再弹验证码
+  const data = await validForm()
+  if (!data) {
+    return
   }
+  if (!loginData.captchaEnable) {
+    await handleLogin({})
+    return
+  }
+  await nextTick()
+  const captcha = verify.value as { show?: () => void } | undefined
+  if (!captcha?.show) {
+    message.error('验证码组件未加载，请刷新页面重试')
+    return
+  }
+  captcha.show()
 }
 // 获取租户 ID
 const getTenantId = async () => {
-  if (loginData.tenantEnable === 'true') {
+  if (loginData.tenantEnable) {
     const res = await LoginApi.getTenantIdByName(loginData.loginForm.tenantName)
     authUtil.setTenantId(res)
   }
@@ -226,7 +235,7 @@ const getLoginFormCache = () => {
 }
 // 根据域名，获得租户信息
 const getTenantByWebsite = async () => {
-  if (loginData.tenantEnable === 'true') {
+  if (loginData.tenantEnable) {
     const website = location.host
     const res = await LoginApi.getTenantByWebsite(website)
     if (res) {
@@ -241,10 +250,6 @@ const handleLogin = async (params: any) => {
   loginLoading.value = true
   try {
     await getTenantId()
-    const data = await validForm()
-    if (!data) {
-      return
-    }
     const loginDataLoginForm = { ...loginData.loginForm }
     loginDataLoginForm.captchaVerification = params.captchaVerification
     const res = await LoginApi.login(loginDataLoginForm)
@@ -283,7 +288,7 @@ const doSocialLogin = async (type: number) => {
     message.error('此方式未配置')
   } else {
     loginLoading.value = true
-    if (loginData.tenantEnable === 'true') {
+    if (loginData.tenantEnable) {
       // 尝试先通过 tenantName 获取租户
       await getTenantId()
       // 如果获取不到，则需要弹出提示，进行处理

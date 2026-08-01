@@ -17,7 +17,7 @@
         </el-form-item>
       </el-col>
       <el-col :span="24" class="px-10px">
-        <el-form-item v-if="resetPasswordData.tenantEnable === 'true'" prop="tenantName">
+        <el-form-item v-if="resetPasswordData.tenantEnable" prop="tenantName">
           <el-input
             v-model="resetPasswordData.tenantName"
             :placeholder="t('login.tenantNamePlaceholder')"
@@ -39,7 +39,7 @@
       </el-col>
       <Verify
         ref="verify"
-        v-if="resetPasswordData.captchaEnable === 'true'"
+        v-if="resetPasswordData.captchaEnable"
         :captchaType="captchaType"
         :imgSize="{ width: '400px', height: '200px' }"
         mode="pop"
@@ -167,8 +167,8 @@ const rules = {
 }
 
 const resetPasswordData = reactive({
-  captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE,
-  tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE,
+  captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
+  tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE === 'true',
   tenantName: '',
   username: '',
   password: '',
@@ -188,18 +188,16 @@ const redirect = ref<string>('')
 
 // 获取验证码
 const getCode = async () => {
-  // 情况一，未开启：则直接发送验证码
-  if (resetPasswordData.captchaEnable === 'false') {
+  if (!resetPasswordData.captchaEnable) {
     await getSmsCode({})
-  } else {
-    // 情况二，已开启：则展示验证码；只有完成验证码的情况，才进行发送验证码
-    // 弹出验证码
-    verify.value.show()
+    return
   }
+  await nextTick()
+  verify.value?.show()
 }
 
 const getSmsCode = async (params) => {
-  if (resetPasswordData.tenantEnable === 'true') {
+  if (resetPasswordData.tenantEnable) {
     await getTenantId()
   }
   smsVO.captchaVerification = params.captchaVerification
@@ -227,7 +225,7 @@ watch(
 )
 
 const getTenantId = async () => {
-  if (resetPasswordData.tenantEnable === 'true') {
+  if (resetPasswordData.tenantEnable) {
     const res = await LoginApi.getTenantIdByName(resetPasswordData.tenantName)
     if (res == null) {
       message.error(t('login.invalidTenantName'))

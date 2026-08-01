@@ -358,14 +358,19 @@ const getPictrue = async () => {
   let data = {
     captchaType: captchaType.value
   }
-  const res = await getCode(data)
-  if (res.repCode == '0000') {
-    backImgBase.value = res.repData.originalImageBase64
-    blockBackImgBase.value = res.repData.jigsawImageBase64
-    backToken.value = res.repData.token
-    secretKey.value = res.repData.secretKey
-  } else {
-    tipWords.value = res.repMsg
+  try {
+    const res = await getCode(data)
+    if (res.repCode == '0000') {
+      backImgBase.value = res.repData.originalImageBase64
+      blockBackImgBase.value = res.repData.jigsawImageBase64
+      backToken.value = res.repData.token
+      secretKey.value = res.repData.secretKey
+    } else {
+      tipWords.value = res.repMsg || '获取验证码失败'
+    }
+  } catch (e) {
+    console.error('[VerifySlide] captcha/get failed', e)
+    tipWords.value = e?.message || '获取验证码失败'
   }
 }
 </script>

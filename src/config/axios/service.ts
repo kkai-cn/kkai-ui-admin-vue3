@@ -33,7 +33,7 @@ let requestList: any[] = []
 // 是否正在刷新中
 let isRefreshToken = false
 // 请求白名单，无须 token 的接口
-const whiteList: string[] = ['/login', '/refresh-token']
+const whiteList: string[] = ['/login', '/refresh-token', '/captcha/']
 
 // 创建axios实例
 const service: AxiosInstance = axios.create({
@@ -144,6 +144,10 @@ service.interceptors.response.use(
       data = await new Response(response.data).json()
     }
     const code = data.code ?? result_code
+    // AJ-Captcha 原样返回（无 code 字段，有 repCode）
+    if (data.repCode !== undefined) {
+      return data
+    }
     // 获取错误信息
     const msg = data.msg || errorCode[code] || errorCode['default']
     if (ignoreMsgs.indexOf(msg) !== -1) {
